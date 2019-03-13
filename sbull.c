@@ -189,9 +189,9 @@ static void sbull_full_request(struct request_queue *q)
 	while ((req = blk_peek_request(q)) != NULL) {
 		sectors_xferred = sbull_xfer_request(dev, req);
 		if (sectors_xferred == -1)
-			end_request(req, 0);
+			blk_end_request(req, -EIO, blk_rq_cur_sectors(req));
 		else
-			__blk_end_request (req, 1, sectors_xferred << 9);
+			blk_end_request(req, 1, sectors_xferred << 9);
 		/* The above includes a call to add_disk_randomness(). */
 	}
 }
