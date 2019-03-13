@@ -118,7 +118,7 @@ static void sbull_request(struct request_queue *q)
 
 		sbull_transfer(dev, blk_rq_pos(req),
 				blk_rq_cur_sectors(req),
-				req->buffer, op);
+				bio_data(req->bio), op);
 		blk_end_request(req, 1, blk_rq_cur_sectors(req));
 	}
 }
