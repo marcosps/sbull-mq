@@ -76,13 +76,13 @@ struct sbull_dev {
         struct timer_list timer;        /* For simulated media changes */
 };
 
+
 static struct sbull_dev *Devices = NULL;
 
-/*
- * Handle an I/O request.
- */
+/* Handle an I/O request */
 static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
-		unsigned long nsect, char *buffer, int write)
+			unsigned long nsect, char *buffer, int op)
+
 {
 	unsigned long offset = sector*KERNEL_SECTOR_SIZE;
 	unsigned long nbytes = nsect*KERNEL_SECTOR_SIZE;
@@ -91,7 +91,9 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 		printk (KERN_NOTICE "Beyond-end write (%ld %ld)\n", offset, nbytes);
 		return;
 	}
-	if (write)
+
+	/* will be only REQ_OP_READ or REQ_OP_WRITE */
+	if (op == REQ_OP_WRITE)
 		memcpy(dev->data + offset, buffer, nbytes);
 	else
 		memcpy(buffer, dev->data + offset, nbytes);
@@ -106,18 +108,18 @@ static void sbull_request(struct request_queue *q)
 
 	while ((req = blk_peek_request(q)) != NULL) {
 		struct sbull_dev *dev = req->rq_disk->private_data;
-		if (! blk_fs_request(req)) {
+		int op = req_op(req);
+
+		if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
 			printk (KERN_NOTICE "Skip non-fs request\n");
-			blk_end_request(req, -EIO, req->current_nr_sectors << 9);
+			blk_end_request(req, -EIO, blk_rq_cur_sectors(req));
 			continue;
 		}
-    //    	printk (KERN_NOTICE "Req dev %d dir %ld sec %ld, nr %d f %lx\n",
-    //    			dev - Devices, rq_data_dir(req),
-    //    			req->sector, req->current_nr_sectors,
-    //    			req->flags);
-		sbull_transfer(dev, req->sector, req->current_nr_sectors,
-				req->buffer, rq_data_dir(req));
-		blk_end_request(req, 1, req->current_nr_sectors << 9);
+
+		sbull_transfer(dev, blk_rq_pos(req),
+				blk_rq_cur_sectors(req),
+				req->buffer, op);
+		blk_end_request(req, 1, blk_rq_cur_sectors(req));
 	}
 }
 
@@ -135,7 +137,7 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 	bio_for_each_segment(bvec, bio, i) {
 		char *buffer = __bio_kmap_atomic(bio, i, KM_USER0);
 		sbull_transfer(dev, sector, bio_cur_sectors(bio),
-				buffer, bio_data_dir(bio) == WRITE);
+				buffer, bio_op(bio));
 		sector += bio_cur_sectors(bio);
 		__bio_kunmap_atomic(bio, KM_USER0);
 	}
@@ -158,8 +160,15 @@ static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
 	rq_for_each_segment(bvec, req, iter) {
 		char *buffer = __bio_kmap_atomic(iter.bio, iter.i, KM_USER0);
 		sector_t sector = iter.bio->bi_sector;
-		sbull_transfer(dev, sector, bio_cur_sectors(iter.bio),
-			       buffer, bio_data_dir(iter.bio) == WRITE);
+		int op = bio_op(iter.bio);
+
+		if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
+			printk (KERN_NOTICE "Skip non-fs request\n");
+			return -1;
+		}
+
+		sbull_transfer(dev, sector, bio_cur_sectors(iter.bio), buffer,
+				op);
 		sector += bio_cur_sectors(iter.bio);
 		__bio_kunmap_atomic(iter.bio, KM_USER0);
 		nsect += iter.bio->bi_size/KERNEL_SECTOR_SIZE;
@@ -178,13 +187,11 @@ static void sbull_full_request(struct request_queue *q)
 	struct sbull_dev *dev = q->queuedata;
 
 	while ((req = blk_peek_request(q)) != NULL) {
-		if (! blk_fs_request(req)) {
-			printk (KERN_NOTICE "Skip non-fs request\n");
-			end_request(req, 0);
-			continue;
-		}
 		sectors_xferred = sbull_xfer_request(dev, req);
-		__blk_end_request (req, 1, sectors_xferred << 9);
+		if (sectors_xferred == -1)
+			end_request(req, 0);
+		else
+			__blk_end_request (req, 1, sectors_xferred << 9);
 		/* The above includes a call to add_disk_randomness(). */
 	}
 }
