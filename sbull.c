@@ -171,7 +171,7 @@ static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
 				op);
 		sector += bio_cur_sectors(iter.bio);
 		__bio_kunmap_atomic(iter.bio, KM_USER0);
-		nsect += iter.bio->bio_iter.bi_size/KERNEL_SECTOR_SIZE;
+		nsect += iter.bio->bi_iter.bi_size/KERNEL_SECTOR_SIZE;
 	}
 	return nsect;
 }
