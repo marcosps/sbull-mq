@@ -202,10 +202,9 @@ static void sbull_full_request(struct request_queue *q)
    static int sbull_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct sbull_dev *dev = q->queuedata;
-	int status;
 
-	status = sbull_xfer_bio(dev, bio);
-	bio_endio(bio, status);
+	bio->bi_status = sbull_xfer_bio(dev, bio);
+	bio_endio(bio);
 	return 0;
 }
 
