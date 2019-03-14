@@ -26,8 +26,8 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static int sbull_major = 0;
 module_param(sbull_major, int, 0);
-static int hardsect_size = 512;
-module_param(hardsect_size, int, 0);
+static int logical_block_size = 512;
+module_param(logical_block_size, int, 0);
 static int nsectors = 1024;	/* How big the drive is */
 module_param(nsectors, int, 0);
 static int ndevices = 4;
@@ -303,7 +303,7 @@ int sbull_ioctl (struct inode *inode, struct file *filp,
 		 * and calculate the corresponding number of cylinders.  We set the
 		 * start of data at sector four.
 		 */
-		size = dev->size*(hardsect_size/KERNEL_SECTOR_SIZE);
+		size = dev->size*(logical_block_size/KERNEL_SECTOR_SIZE);
 		geo.cylinders = (size & ~0x3f) >> 6;
 		geo.heads = 4;
 		geo.sectors = 16;
@@ -340,7 +340,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	 * Get some memory.
 	 */
 	memset (dev, 0, sizeof (struct sbull_dev));
-	dev->size = nsectors*hardsect_size;
+	dev->size = nsectors*logical_block_size;
 	dev->data = vmalloc(dev->size);
 	if (dev->data == NULL) {
 		printk (KERN_NOTICE "vmalloc failure.\n");
@@ -383,7 +383,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 			goto out_vfree;
 		break;
 	}
-	blk_queue_hardsect_size(dev->queue, hardsect_size);
+	blk_queue_logical_block_size(dev->queue, logical_block_size);
 	dev->queue->queuedata = dev;
 	/*
 	 * And the gendisk structure.
@@ -399,7 +399,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	dev->gd->queue = dev->queue;
 	dev->gd->private_data = dev;
 	snprintf (dev->gd->disk_name, 32, "sbull%c", which + 'a');
-	set_capacity(dev->gd, nsectors*(hardsect_size/KERNEL_SECTOR_SIZE));
+	set_capacity(dev->gd, nsectors*(logical_block_size/KERNEL_SECTOR_SIZE));
 	add_disk(dev->gd);
 	return;
 
