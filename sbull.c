@@ -129,13 +129,13 @@ static void sbull_request(struct request_queue *q)
  */
 static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 {
-	int i;
-	struct bio_vec *bvec;
+	struct bvec_iter i;
+	struct bio_vec bvec;
 	sector_t sector = bio->bi_iter.bi_sector;
 
 	/* Do each segment independently. */
 	bio_for_each_segment(bvec, bio, i) {
-		char *buffer = kmap_atomic(bvec->bv_page) + bvec->bv_offset;
+		char *buffer = kmap_atomic(bvec.bv_page) + bvec.bv_offset;
 		sbull_transfer(dev, sector, bio_cur_bytes(bio),
 				buffer, bio_op(bio));
 		sector += bio_cur_bytes(bio);
@@ -149,16 +149,15 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
  */
 static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
 {
-
 	struct req_iterator iter;
 	int nsect = 0;
-	struct bio_vec *bvec;
+	struct bio_vec bvec;
 
 	/* Macro rq_for_each_bio is gone.
 	 * In most cases one should use rq_for_each_segment.
 	 */
 	rq_for_each_segment(bvec, req, iter) {
-		char *buffer = kmap_atomic(bvec->bv_page) + bvec->bv_offset;
+		char *buffer = kmap_atomic(bvec.bv_page) + bvec.bv_offset;
 		sector_t sector = iter.bio->bi_iter.bi_sector;
 		int op = bio_op(iter.bio);
 
