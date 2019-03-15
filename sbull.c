@@ -48,8 +48,6 @@ module_param(request_mode, int, 0);
  * Minor number and partition management.
  */
 #define SBULL_MINORS	16
-#define MINOR_SHIFT	4
-#define DEVNUM(kdevnum)	(MINOR(kdev_t_to_nr(kdevnum)) >> MINOR_SHIFT
 
 /*
  * We can tweak our hardware sector size, but the kernel talks to us
