@@ -281,39 +281,24 @@ void sbull_invalidate(unsigned long ldev)
 	spin_unlock(&dev->lock);
 }
 
-/*
- * The ioctl() implementation
- */
-
-int sbull_ioctl (struct block_device *bdev, fmode_t mode,
-                 unsigned int cmd, unsigned long arg)
+static int sbull_getgeo (struct block_device *bdev, struct hd_geometry *geo)
 {
 	long size;
-	struct hd_geometry geo;
 	struct sbull_dev *dev = bdev->bd_disk->private_data;
 
-	switch(cmd) {
-	    case HDIO_GETGEO:
-        	/*
-		 * Get geometry: since we are a virtual device, we have to make
-		 * up something plausible.  So we claim 16 sectors, four heads,
-		 * and calculate the corresponding number of cylinders.  We set the
-		 * start of data at sector four.
-		 */
-		size = dev->size*(logical_block_size/KERNEL_SECTOR_SIZE);
-		geo.cylinders = (size & ~0x3f) >> 6;
-		geo.heads = 4;
-		geo.sectors = 16;
-		geo.start = 4;
-		if (copy_to_user((void __user *) arg, &geo, sizeof(geo)))
-			return -EFAULT;
-		return 0;
-	}
-
-	return -ENOTTY; /* unknown command */
+       	/*
+	 * since we are a virtual device, we have to make
+	 * up something plausible.  So we claim 16 sectors, four heads,
+	 * and calculate the corresponding number of cylinders.  We set the
+	 * start of data at sector four.
+	 */
+	size = dev->size * (logical_block_size/KERNEL_SECTOR_SIZE);
+	geo->cylinders = (size & ~0x3f) >> 6;
+	geo->heads = 4;
+	geo->sectors = 16;
+	geo->start = 4;
+	return 0;
 }
-
-
 
 /*
  * The device operations structure.
@@ -324,9 +309,8 @@ static struct block_device_operations sbull_ops = {
 	.release 	 = sbull_release,
 	.media_changed   = sbull_media_changed,
 	.revalidate_disk = sbull_revalidate,
-	.ioctl	         = sbull_ioctl
+	.getgeo		 = sbull_getgeo,
 };
-
 
 /*
  * Set up our internal device.
