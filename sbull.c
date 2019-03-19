@@ -24,7 +24,7 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-static int sbull_major = 0;
+static int sbull_major;
 module_param(sbull_major, int, 0);
 static int logical_block_size = 512;
 module_param(logical_block_size, int, 0);
@@ -58,24 +58,24 @@ module_param(request_mode, int, 0);
 /*
  * After this much idle time, the driver will simulate a media change.
  */
-#define INVALIDATE_DELAY	30*HZ
+#define INVALIDATE_DELAY	(30 * HZ)
 
 /*
  * The internal representation of our device.
  */
 struct sbull_dev {
-        int size;                       /* Device size in sectors */
-        u8 *data;                       /* The data array */
-        short users;                    /* How many users */
-        short media_change;             /* Flag a media change? */
-        spinlock_t lock;                /* For mutual exclusion */
-        struct request_queue *queue;    /* The device request queue */
-        struct gendisk *gd;             /* The gendisk structure */
-        struct timer_list timer;        /* For simulated media changes */
+	int size;                       /* Device size in sectors */
+	u8 *data;                       /* The data array */
+	short users;                    /* How many users */
+	short media_change;             /* Flag a media change? */
+	spinlock_t lock;                /* For mutual exclusion */
+	struct request_queue *queue;    /* The device request queue */
+	struct gendisk *gd;             /* The gendisk structure */
+	struct timer_list timer;        /* For simulated media changes */
 };
 
 
-static struct sbull_dev *Devices = NULL;
+static struct sbull_dev *Devices;
 
 /* Handle an I/O request */
 static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
@@ -86,7 +86,7 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 	unsigned long nbytes = nsect*KERNEL_SECTOR_SIZE;
 
 	if ((offset + nbytes) > dev->size) {
-		printk (KERN_NOTICE "Beyond-end write (%ld %ld)\n", offset, nbytes);
+		pr_notice("Beyond-end write (%ld %ld)\n", offset, nbytes);
 		return;
 	}
 
@@ -109,7 +109,7 @@ static void sbull_request(struct request_queue *q)
 		int op = req_op(req);
 
 		if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
-			printk (KERN_NOTICE "Skip non-fs request\n");
+			pr_notice("Skip non-fs request\n");
 			blk_end_request(req, -EIO, blk_rq_cur_sectors(req));
 			continue;
 		}
@@ -134,6 +134,7 @@ static int sbull_xfer_bio(struct sbull_dev *dev, struct bio *bio)
 	/* Do each segment independently. */
 	bio_for_each_segment(bvec, bio, i) {
 		char *buffer = kmap_atomic(bvec.bv_page) + bvec.bv_offset;
+
 		sbull_transfer(dev, sector, bio_cur_bytes(bio),
 				buffer, bio_op(bio));
 		sector += bio_cur_bytes(bio);
@@ -160,7 +161,7 @@ static int sbull_xfer_request(struct sbull_dev *dev, struct request *req)
 		int op = bio_op(iter.bio);
 
 		if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
-			printk (KERN_NOTICE "Skip non-fs request\n");
+			pr_notice("Skip non-fs request\n");
 			return -1;
 		}
 
@@ -216,7 +217,7 @@ static int sbull_open(struct block_device *bdev, fmode_t mode)
 
 	del_timer_sync(&dev->timer);
 	spin_lock(&dev->lock);
-	if (! dev->users) 
+	if (!dev->users)
 		check_disk_change(bdev);
 	dev->users++;
 	spin_unlock(&dev->lock);
@@ -243,7 +244,7 @@ static void sbull_release(struct gendisk *disk, fmode_t mode)
 int sbull_media_changed(struct gendisk *gd)
 {
 	struct sbull_dev *dev = gd->private_data;
-	
+
 	return dev->media_change;
 }
 
@@ -254,10 +255,10 @@ int sbull_media_changed(struct gendisk *gd)
 int sbull_revalidate(struct gendisk *gd)
 {
 	struct sbull_dev *dev = gd->private_data;
-	
+
 	if (dev->media_change) {
 		dev->media_change = 0;
-		memset (dev->data, 0, dev->size);
+		memset(dev->data, 0, dev->size);
 	}
 	return 0;
 }
@@ -271,19 +272,19 @@ void sbull_invalidate(unsigned long ldev)
 	struct sbull_dev *dev = (struct sbull_dev *) ldev;
 
 	spin_lock(&dev->lock);
-	if (dev->users || !dev->data) 
-		printk (KERN_WARNING "sbull: timer sanity check failed\n");
+	if (dev->users || !dev->data)
+		pr_warn("sbull: timer sanity check failed\n");
 	else
 		dev->media_change = 1;
 	spin_unlock(&dev->lock);
 }
 
-static int sbull_getgeo (struct block_device *bdev, struct hd_geometry *geo)
+static int sbull_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 {
 	long size;
 	struct sbull_dev *dev = bdev->bd_disk->private_data;
 
-       	/*
+	/*
 	 * since we are a virtual device, we have to make
 	 * up something plausible.  So we claim 16 sectors, four heads,
 	 * and calculate the corresponding number of cylinders.  We set the
@@ -300,13 +301,13 @@ static int sbull_getgeo (struct block_device *bdev, struct hd_geometry *geo)
 /*
  * The device operations structure.
  */
-static struct block_device_operations sbull_ops = {
-	.owner           = THIS_MODULE,
-	.open 	         = sbull_open,
-	.release 	 = sbull_release,
-	.media_changed   = sbull_media_changed,
+const static struct block_device_operations sbull_ops = {
+	.owner		= THIS_MODULE,
+	.open		= sbull_open,
+	.release	= sbull_release,
+	.media_changed	= sbull_media_changed,
 	.revalidate_disk = sbull_revalidate,
-	.getgeo		 = sbull_getgeo,
+	.getgeo		= sbull_getgeo,
 };
 
 /*
@@ -317,45 +318,45 @@ static void setup_device(struct sbull_dev *dev, int which)
 	/*
 	 * Get some memory.
 	 */
-	memset (dev, 0, sizeof (struct sbull_dev));
+	memset(dev, 0, sizeof(struct sbull_dev));
 	dev->size = nsectors*logical_block_size;
 	dev->data = vmalloc(dev->size);
 	if (dev->data == NULL) {
-		printk (KERN_NOTICE "vmalloc failure.\n");
+		pr_notice("vmalloc failure.\n");
 		return;
 	}
 	spin_lock_init(&dev->lock);
-	
+
 	/*
 	 * The timer which "invalidates" the device.
 	 */
 	init_timer(&dev->timer);
 	dev->timer.data = (unsigned long) dev;
 	dev->timer.function = sbull_invalidate;
-	
+
 	/*
 	 * The I/O queue, depending on whether we are using our own
 	 * make_request function or not.
 	 */
 	switch (request_mode) {
-	    case RM_NOQUEUE:
+	case RM_NOQUEUE:
 		dev->queue = blk_alloc_queue(GFP_KERNEL);
 		if (dev->queue == NULL)
 			goto out_vfree;
 		blk_queue_make_request(dev->queue, sbull_make_request);
 		break;
 
-	    case RM_FULL:
+	case RM_FULL:
 		dev->queue = blk_init_queue(sbull_full_request, &dev->lock);
 		if (dev->queue == NULL)
 			goto out_vfree;
 		break;
 
-	    default:
-		printk(KERN_NOTICE "Bad request mode %d, using simple\n", request_mode);
-        	/* fall into.. */
-	
-	    case RM_SIMPLE:
+	default:
+		pr_notice("Bad request mode %d, using simple\n", request_mode);
+		/* fall into.. */
+
+	case RM_SIMPLE:
 		dev->queue = blk_init_queue(sbull_request, &dev->lock);
 		if (dev->queue == NULL)
 			goto out_vfree;
@@ -367,8 +368,8 @@ static void setup_device(struct sbull_dev *dev, int which)
 	 * And the gendisk structure.
 	 */
 	dev->gd = alloc_disk(SBULL_MINORS);
-	if (! dev->gd) {
-		printk (KERN_NOTICE "alloc_disk failure\n");
+	if (!dev->gd) {
+		pr_notice("alloc_disk failure\n");
 		goto out_vfree;
 	}
 	dev->gd->major = sbull_major;
@@ -376,12 +377,12 @@ static void setup_device(struct sbull_dev *dev, int which)
 	dev->gd->fops = &sbull_ops;
 	dev->gd->queue = dev->queue;
 	dev->gd->private_data = dev;
-	snprintf (dev->gd->disk_name, 32, "sbull%c", which + 'a');
+	snprintf(dev->gd->disk_name, 32, "sbull%c", which + 'a');
 	set_capacity(dev->gd, nsectors*(logical_block_size/KERNEL_SECTOR_SIZE));
 	add_disk(dev->gd);
 	return;
 
-  out_vfree:
+out_vfree:
 	if (dev->data)
 		vfree(dev->data);
 }
@@ -396,21 +397,21 @@ static int __init sbull_init(void)
 	 */
 	sbull_major = register_blkdev(sbull_major, "sbull");
 	if (sbull_major <= 0) {
-		printk(KERN_WARNING "sbull: unable to get major number\n");
+		pr_warn("sbull: unable to get major number\n");
 		return -EBUSY;
 	}
 	/*
 	 * Allocate the device array, and initialize each one.
 	 */
-	Devices = kmalloc(ndevices*sizeof (struct sbull_dev), GFP_KERNEL);
+	Devices = kmalloc(ndevices * sizeof(struct sbull_dev), GFP_KERNEL);
 	if (Devices == NULL)
 		goto out_unregister;
-	for (i = 0; i < ndevices; i++) 
+	for (i = 0; i < ndevices; i++)
 		setup_device(Devices + i, i);
-    
+
 	return 0;
 
-  out_unregister:
+out_unregister:
 	unregister_blkdev(sbull_major, "sbd");
 	return -ENOMEM;
 }
@@ -428,9 +429,9 @@ static void sbull_exit(void)
 			put_disk(dev->gd);
 		}
 		if (dev->queue) {
+			/* blk_put_queue() is no longer an exported symbol */
 			if (request_mode == RM_NOQUEUE)
-				kobject_put (&dev->queue->kobj);
-				/* blk_put_queue() is no longer an exported symbol */
+				kobject_put(&dev->queue->kobj);
 			else
 				blk_cleanup_queue(dev->queue);
 		}
@@ -440,6 +441,6 @@ static void sbull_exit(void)
 	unregister_blkdev(sbull_major, "sbull");
 	kfree(Devices);
 }
-	
+
 module_init(sbull_init);
 module_exit(sbull_exit);
