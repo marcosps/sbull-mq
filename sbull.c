@@ -104,7 +104,7 @@ static void sbull_request(struct request_queue *q)
 {
 	struct request *req;
 
-	while ((req = blk_peek_request(q)) != NULL) {
+	while ((req = blk_fetch_request(q)) != NULL) {
 		struct sbull_dev *dev = req->rq_disk->private_data;
 		int op = req_op(req);
 
