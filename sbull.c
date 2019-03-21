@@ -110,14 +110,14 @@ static void sbull_request(struct request_queue *q)
 
 		if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
 			pr_notice("Skip non-fs request\n");
-			blk_end_request(req, -EIO, blk_rq_cur_sectors(req));
+			__blk_end_request_all(req, -EIO);
 			continue;
 		}
 
 		sbull_transfer(dev, blk_rq_pos(req),
 				blk_rq_cur_sectors(req),
 				bio_data(req->bio), op);
-		blk_end_request(req, 1, blk_rq_cur_sectors(req));
+		__blk_end_request_all(req, 0);
 	}
 }
 
@@ -187,9 +187,9 @@ static void sbull_full_request(struct request_queue *q)
 	while ((req = blk_peek_request(q)) != NULL) {
 		sectors_xferred = sbull_xfer_request(dev, req);
 		if (sectors_xferred == -1)
-			blk_end_request(req, -EIO, blk_rq_cur_sectors(req));
+			__blk_end_request(req, -EIO, blk_rq_cur_sectors(req));
 		else
-			blk_end_request(req, 1, sectors_xferred << 9);
+			__blk_end_request(req, 0, sectors_xferred << 9);
 		/* The above includes a call to add_disk_randomness(). */
 	}
 }
@@ -400,6 +400,7 @@ static int __init sbull_init(void)
 		pr_warn("sbull: unable to get major number\n");
 		return -EBUSY;
 	}
+
 	/*
 	 * Allocate the device array, and initialize each one.
 	 */
