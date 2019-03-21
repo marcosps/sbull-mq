@@ -201,7 +201,7 @@ static blk_qc_t sbull_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct sbull_dev *dev = q->queuedata;
 
-	bio->bi_status = sbull_xfer_bio(dev, bio);
+	bio->bi_flags = sbull_xfer_bio(dev, bio);
 	bio_endio(bio);
 	return 0;
 }
