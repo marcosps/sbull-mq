@@ -320,7 +320,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	 */
 	memset(dev, 0, sizeof(struct sbull_dev));
 	dev->size = nsectors*logical_block_size;
-	dev->data = vmalloc(dev->size);
+	dev->data = vzalloc(dev->size);
 	if (dev->data == NULL) {
 		pr_notice("vmalloc failure.\n");
 		return;
