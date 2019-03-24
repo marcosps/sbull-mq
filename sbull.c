@@ -32,6 +32,8 @@ static int nsectors = 65536;	/* How big the drive is */
 module_param(nsectors, int, 0);
 static int ndevices = 4;
 module_param(ndevices, int, 0);
+static bool debug = false;
+module_param(debug, bool, false);
 
 /*
  * The different "request modes" we can use.
@@ -89,6 +91,13 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 		pr_notice("Beyond-end write (%ld %ld)\n", offset, nbytes);
 		return;
 	}
+
+	if  (debug)
+		pr_info("%s: %s, sector: %ld, nsectors: %ld, offset: %ld,"
+			       "nbytes: %ld",
+			dev->gd->disk_name,
+			op == REQ_OP_WRITE ? "WRITE" : "READ", sector, nsect,
+			offset, nbytes);
 
 	/* will be only REQ_OP_READ or REQ_OP_WRITE */
 	if (op == REQ_OP_WRITE)
