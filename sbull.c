@@ -11,7 +11,6 @@
 #include <linux/slab.h>		/* kmalloc() */
 #include <linux/fs.h>		/* everything... */
 #include <linux/errno.h>	/* error codes */
-#include <linux/timer.h>
 #include <linux/types.h>	/* size_t */
 #include <linux/fcntl.h>	/* O_ACCMODE */
 #include <linux/hdreg.h>	/* HDIO_GETGEO */
@@ -73,7 +72,6 @@ struct sbull_dev {
 	spinlock_t lock;                /* For mutual exclusion */
 	struct request_queue *queue;    /* The device request queue */
 	struct gendisk *gd;             /* The gendisk structure */
-	struct timer_list timer;        /* For simulated media changes */
 };
 
 
@@ -224,7 +222,6 @@ static int sbull_open(struct block_device *bdev, fmode_t mode)
 {
 	struct sbull_dev *dev = bdev->bd_disk->private_data;
 
-	del_timer_sync(&dev->timer);
 	spin_lock(&dev->lock);
 	if (!dev->users)
 		check_disk_change(bdev);
@@ -239,11 +236,6 @@ static void sbull_release(struct gendisk *disk, fmode_t mode)
 
 	spin_lock(&dev->lock);
 	dev->users--;
-
-	if (!dev->users) {
-		dev->timer.expires = jiffies + INVALIDATE_DELAY;
-		add_timer(&dev->timer);
-	}
 	spin_unlock(&dev->lock);
 }
 
@@ -255,37 +247,6 @@ int sbull_media_changed(struct gendisk *gd)
 	struct sbull_dev *dev = gd->private_data;
 
 	return dev->media_change;
-}
-
-/*
- * Revalidate.  WE DO NOT TAKE THE LOCK HERE, for fear of deadlocking
- * with open.  That needs to be reevaluated.
- */
-int sbull_revalidate(struct gendisk *gd)
-{
-	struct sbull_dev *dev = gd->private_data;
-
-	if (dev->media_change) {
-		dev->media_change = 0;
-		memset(dev->data, 0, dev->size);
-	}
-	return 0;
-}
-
-/*
- * The "invalidate" function runs out of the device timer; it sets
- * a flag to simulate the removal of the media.
- */
-void sbull_invalidate(unsigned long ldev)
-{
-	struct sbull_dev *dev = (struct sbull_dev *) ldev;
-
-	spin_lock(&dev->lock);
-	if (dev->users || !dev->data)
-		pr_warn("sbull: timer sanity check failed\n");
-	else
-		dev->media_change = 1;
-	spin_unlock(&dev->lock);
 }
 
 static int sbull_getgeo(struct block_device *bdev, struct hd_geometry *geo)
@@ -315,7 +276,6 @@ const static struct block_device_operations sbull_ops = {
 	.open		= sbull_open,
 	.release	= sbull_release,
 	.media_changed	= sbull_media_changed,
-	.revalidate_disk = sbull_revalidate,
 	.getgeo		= sbull_getgeo,
 };
 
@@ -335,13 +295,6 @@ static void setup_device(struct sbull_dev *dev, int which)
 		return;
 	}
 	spin_lock_init(&dev->lock);
-
-	/*
-	 * The timer which "invalidates" the device.
-	 */
-	init_timer(&dev->timer);
-	dev->timer.data = (unsigned long) dev;
-	dev->timer.function = sbull_invalidate;
 
 	/*
 	 * The I/O queue, depending on whether we are using our own
@@ -433,7 +386,6 @@ static void sbull_exit(void)
 	for (i = 0; i < ndevices; i++) {
 		struct sbull_dev *dev = Devices + i;
 
-		del_timer_sync(&dev->timer);
 		if (dev->gd) {
 			del_gendisk(dev->gd);
 			put_disk(dev->gd);
