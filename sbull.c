@@ -222,6 +222,7 @@ static int sbull_open(struct block_device *bdev, fmode_t mode)
 {
 	struct sbull_dev *dev = bdev->bd_disk->private_data;
 
+	(void)mode;
 	spin_lock(&dev->lock);
 	if (!dev->users)
 		check_disk_change(bdev);
@@ -234,6 +235,7 @@ static void sbull_release(struct gendisk *disk, fmode_t mode)
 {
 	struct sbull_dev *dev = disk->private_data;
 
+	(void)mode;
 	spin_lock(&dev->lock);
 	dev->users--;
 	spin_unlock(&dev->lock);
@@ -271,7 +273,7 @@ static int sbull_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 /*
  * The device operations structure.
  */
-const static struct block_device_operations sbull_ops = {
+static const struct block_device_operations sbull_ops = {
 	.owner		= THIS_MODULE,
 	.open		= sbull_open,
 	.release	= sbull_release,
@@ -316,8 +318,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 
 	default:
 		pr_notice("Bad request mode %d, using simple\n", request_mode);
-		/* fall into.. */
-
+		/* fall-thru */
 	case RM_SIMPLE:
 		dev->queue = blk_init_queue(sbull_request, &dev->lock);
 		if (dev->queue == NULL)
