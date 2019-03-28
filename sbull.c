@@ -29,7 +29,7 @@ static int logical_block_size = 512;
 module_param(logical_block_size, int, 0);
 static int nsectors = 65536;	/* How big the drive is */
 module_param(nsectors, int, 0);
-static int ndevices = 4;
+static int ndevices = 1;
 module_param(ndevices, int, 0);
 static bool debug = false;
 module_param(debug, bool, false);
