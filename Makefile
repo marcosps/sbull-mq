@@ -1,4 +1,8 @@
-obj-m := sbull.o
+ifdef SQ
+	obj-m := sbull.o
+else
+	obj-m := sbull-mq.o
+endif
 
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
