@@ -55,11 +55,6 @@ enum {
 #define KERNEL_SECTOR_SIZE	512
 
 /*
- * After this much idle time, the driver will simulate a media change.
- */
-#define INVALIDATE_DELAY	(30 * HZ)
-
-/*
  * The internal representation of our device.
  */
 struct sbull_dev {
@@ -160,43 +155,12 @@ static void sbull_release(struct gendisk *disk, fmode_t mode)
 }
 
 /*
- * Look for a (simulated) media change.
- */
-int sbull_media_changed(struct gendisk *gd)
-{
-	struct sbull_dev *dev = gd->private_data;
-
-	return dev->media_change;
-}
-
-static int sbull_getgeo(struct block_device *bdev, struct hd_geometry *geo)
-{
-	long size;
-	struct sbull_dev *dev = bdev->bd_disk->private_data;
-
-	/*
-	 * since we are a virtual device, we have to make
-	 * up something plausible.  So we claim 16 sectors, four heads,
-	 * and calculate the corresponding number of cylinders.  We set the
-	 * start of data at sector four.
-	 */
-	size = dev->size * (logical_block_size/KERNEL_SECTOR_SIZE);
-	geo->cylinders = (size & ~0x3f) >> 6;
-	geo->heads = 4;
-	geo->sectors = 16;
-	geo->start = 4;
-	return 0;
-}
-
-/*
  * The device operations structure.
  */
 static const struct block_device_operations sbull_ops = {
 	.owner		= THIS_MODULE,
 	.open		= sbull_open,
 	.release	= sbull_release,
-	.media_changed	= sbull_media_changed,
-	.getgeo		= sbull_getgeo,
 };
 
 static const struct blk_mq_ops sbull_mq_ops = {
