@@ -77,7 +77,7 @@ struct sbull_dev {
 static struct sbull_dev *Devices;
 
 /* Handle an I/O request */
-static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
+static blk_status_t sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 			unsigned long nsect, char *buffer, int op)
 
 {
@@ -86,7 +86,7 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 
 	if ((offset + nbytes) > dev->size) {
 		pr_notice("Beyond-end write (%ld %ld)\n", offset, nbytes);
-		return;
+		return BLK_STS_IOERR;
 	}
 
 	if  (debug)
@@ -101,6 +101,8 @@ static void sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 		memcpy(dev->data + offset, buffer, nbytes);
 	else
 		memcpy(buffer, dev->data + offset, nbytes);
+
+	return BLK_STS_OK;
 }
 
 static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
@@ -109,19 +111,25 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct request *req = bd->rq;
 	struct sbull_dev *dev = req->rq_disk->private_data;
 	int op = req_op(req);
+	blk_status_t ret;
 
 	blk_mq_start_request(req);
+	spin_lock(&dev->lock);
 
 	if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
 		pr_notice("Skip non-fs request\n");
+		blk_mq_end_request(req, BLK_STS_IOERR);
+		spin_unlock(&dev->lock);
 		return BLK_STS_IOERR;
 	}
 
-	sbull_transfer(dev, blk_rq_pos(req),
+	ret = sbull_transfer(dev, blk_rq_pos(req),
 			blk_rq_cur_sectors(req),
 			bio_data(req->bio), op);
-	blk_mq_end_request(req, 0);
-	return BLK_STS_OK;
+
+	blk_mq_end_request(req, ret);
+	spin_unlock(&dev->lock);
+	return ret;
 }
 
 /*
