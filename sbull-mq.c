@@ -21,18 +21,23 @@
 #include <linux/buffer_head.h>	/* invalidate_bdev */
 #include <linux/bio.h>
 
+/* FIXME: implement these macros in kernel mainline */
+#define size_to_sectors(size) ((size) >> SECTOR_SHIFT)
+#define sectors_to_size(size) ((size) << SECTOR_SHIFT)
+
 MODULE_LICENSE("Dual BSD/GPL");
 
 static int sbull_major;
 module_param(sbull_major, int, 0);
 static int logical_block_size = 512;
 module_param(logical_block_size, int, 0);
-static int nsectors = 65535;	/* How big the drive is */
-module_param(nsectors, int, 0);
+static char* disk_size = "256M";
+module_param(disk_size, charp, 0);
 static int ndevices = 1;
 module_param(ndevices, int, 0);
 static bool debug = false;
 module_param(debug, bool, false);
+
 
 /*
  * The different "request modes" we can use.
@@ -76,8 +81,8 @@ static blk_status_t sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 			unsigned long nsect, char *buffer, int op)
 
 {
-	unsigned long offset = sector*KERNEL_SECTOR_SIZE;
-	unsigned long nbytes = nsect*KERNEL_SECTOR_SIZE;
+	unsigned long offset = sectors_to_size(sector);
+	unsigned long nbytes = sectors_to_size(nsect);
 
 	if ((offset + nbytes) > dev->size) {
 		pr_notice("Beyond-end write (%ld %ld)\n", offset, nbytes);
@@ -86,7 +91,7 @@ static blk_status_t sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 
 	if  (debug)
 		pr_info("%s: %s, sector: %ld, nsectors: %ld, offset: %ld,"
-			       "nbytes: %ld",
+			       " nbytes: %ld",
 			dev->gd->disk_name,
 			op == REQ_OP_WRITE ? "WRITE" : "READ", sector, nsect,
 			offset, nbytes);
@@ -172,11 +177,10 @@ static const struct blk_mq_ops sbull_mq_ops = {
  */
 static void setup_device(struct sbull_dev *dev, int which)
 {
-	/*
-	 * Get some memory.
-	 */
+	long long sbull_size = memparse(disk_size, NULL);
+
 	memset(dev, 0, sizeof(struct sbull_dev));
-	dev->size = nsectors*logical_block_size;
+	dev->size = sbull_size;
 	dev->data = vzalloc(dev->size);
 	if (dev->data == NULL) {
 		pr_notice("vmalloc failure.\n");
@@ -205,7 +209,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	dev->gd->queue = dev->queue;
 	dev->gd->private_data = dev;
 	snprintf(dev->gd->disk_name, 32, "sbull%c", which + 'a');
-	set_capacity(dev->gd, nsectors*(logical_block_size/KERNEL_SECTOR_SIZE));
+	set_capacity(dev->gd, size_to_sectors(sbull_size));
 	add_disk(dev->gd);
 	return;
 
