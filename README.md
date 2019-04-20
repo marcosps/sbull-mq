@@ -22,4 +22,4 @@ TODO sbull MQ:
 --------------
 - [x] Make sbull compile in current master
 - [x] Run vfat
-- [ ] Run other file systems  on sbull (ext4, xfs, ...)
+- [x] Run other file systems  on sbull (ext4, xfs, ...)
