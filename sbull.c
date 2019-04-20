@@ -27,8 +27,8 @@ static int sbull_major;
 module_param(sbull_major, int, 0);
 static int logical_block_size = 512;
 module_param(logical_block_size, int, 0);
-static int nsectors = 65535;	/* How big the drive is */
-module_param(nsectors, int, 0);
+static char *disk_size = "256M";
+module_param(disk_size, charp, 0);
 static int ndevices = 1;
 module_param(ndevices, int, 0);
 static bool debug = false;
@@ -277,8 +277,8 @@ static const struct block_device_operations sbull_ops = {
 	.owner		= THIS_MODULE,
 	.open		= sbull_open,
 	.release	= sbull_release,
-	.media_changed	= sbull_media_changed,
-	.getgeo		= sbull_getgeo,
+	.media_changed  = sbull_media_changed,
+	.getgeo     = sbull_getgeo,
 };
 
 /*
@@ -289,8 +289,11 @@ static void setup_device(struct sbull_dev *dev, int which)
 	/*
 	 * Get some memory.
 	 */
+
+	long long sbull_size = memparse(disk_size, NULL);
+
 	memset(dev, 0, sizeof(struct sbull_dev));
-	dev->size = nsectors*logical_block_size;
+	dev->size = sbull_size;
 	dev->data = vzalloc(dev->size);
 	if (dev->data == NULL) {
 		pr_notice("vmalloc failure.\n");
@@ -341,7 +344,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	dev->gd->queue = dev->queue;
 	dev->gd->private_data = dev;
 	snprintf(dev->gd->disk_name, 32, "sbull%c", which + 'a');
-	set_capacity(dev->gd, nsectors*(logical_block_size/KERNEL_SECTOR_SIZE));
+	set_capacity(dev->gd, sbull_size / KERNEL_SECTOR_SIZE);
 	add_disk(dev->gd);
 	return;
 
