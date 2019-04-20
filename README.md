@@ -16,7 +16,7 @@ TODO sbull SQ:
 
 - [x] Make sbull compile in kernel 4.12
 - [x] Run vfat
-- [ ] Run other file systems  on sbull (ext4, xfs, ...)
+- [x] Run other file systems  on sbull (ext4, xfs, ...)
 
 TODO sbull MQ:
 --------------
