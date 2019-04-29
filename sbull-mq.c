@@ -21,6 +21,20 @@
 #include <linux/buffer_head.h>	/* invalidate_bdev */
 #include <linux/bio.h>
 
+#ifndef BLK_STS_OK
+typedef int blk_status_t;
+#define BLK_STS_OK 0
+#define OLDER_KERNEL 1
+#endif
+
+#ifndef BLK_STS_IOERR
+#define BLK_STS_IOERR 10
+#endif
+
+#ifndef SECTOR_SHIFT
+#define SECTOR_SHIFT 9
+#endif
+
 /* FIXME: implement these macros in kernel mainline */
 #define size_to_sectors(size) ((size) >> SECTOR_SHIFT)
 #define sectors_to_size(size) ((size) << SECTOR_SHIFT)
@@ -37,7 +51,6 @@ static int ndevices = 1;
 module_param(ndevices, int, 0);
 static bool debug = false;
 module_param(debug, bool, false);
-
 
 /*
  * The different "request modes" we can use.
@@ -172,6 +185,38 @@ static const struct blk_mq_ops sbull_mq_ops = {
 	.queue_rq = sbull_queue_rq,
 };
 
+static struct request_queue *create_req_queue(struct blk_mq_tag_set *set)
+{
+	struct request_queue *q;
+
+#ifndef OLDER_KERNEL
+	q = blk_mq_init_sq_queue(set, &sbull_mq_ops,
+			2, BLK_MQ_F_SHOULD_MERGE | BLK_MQ_F_BLOCKING);
+#else
+	int ret;
+
+	memset(set, 0, sizeof(*set));
+	set->ops = &sbull_mq_ops;
+	set->nr_hw_queues = 1;
+	/*set->nr_maps = 1;*/
+	set->queue_depth = 2;
+	set->numa_node = NUMA_NO_NODE;
+	set->flags = BLK_MQ_F_SHOULD_MERGE | BLK_MQ_F_BLOCKING;
+
+	ret = blk_mq_alloc_tag_set(set);
+	if (ret)
+		return ERR_PTR(ret);
+
+	q = blk_mq_init_queue(set);
+	if (IS_ERR(q)) {
+		blk_mq_free_tag_set(set);
+		return q;
+	}
+#endif
+
+	return q;
+}
+
 /*
  * Set up our internal device.
  */
@@ -188,8 +233,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	}
 	spin_lock_init(&dev->lock);
 
-	dev->queue = blk_mq_init_sq_queue(&dev->tag_set, &sbull_mq_ops,
-			2, BLK_MQ_F_SHOULD_MERGE | BLK_MQ_F_BLOCKING);
+	dev->queue = create_req_queue(&dev->tag_set);
 	if (IS_ERR(dev->queue))
 		goto out_vfree;
 
