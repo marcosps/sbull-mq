@@ -78,14 +78,11 @@ enum {
 struct sbull_dev {
 	int size;                       /* Device size in sectors */
 	u8 *data;                       /* The data array */
-	short users;                    /* How many users */
-	short media_change;             /* Flag a media change? */
 	spinlock_t lock;                /* For mutual exclusion */
 	struct request_queue *queue;    /* The device request queue */
 	struct gendisk *gd;             /* The gendisk structure */
 	struct blk_mq_tag_set tag_set;
 };
-
 
 static struct sbull_dev *Devices;
 
@@ -146,39 +143,10 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 }
 
 /*
- * Open and close.
- */
-
-static int sbull_open(struct block_device *bdev, fmode_t mode)
-{
-	struct sbull_dev *dev = bdev->bd_disk->private_data;
-
-	(void)mode;
-	spin_lock(&dev->lock);
-	if (!dev->users)
-		check_disk_change(bdev);
-	dev->users++;
-	spin_unlock(&dev->lock);
-	return 0;
-}
-
-static void sbull_release(struct gendisk *disk, fmode_t mode)
-{
-	struct sbull_dev *dev = disk->private_data;
-
-	(void)mode;
-	spin_lock(&dev->lock);
-	dev->users--;
-	spin_unlock(&dev->lock);
-}
-
-/*
  * The device operations structure.
  */
 static const struct block_device_operations sbull_ops = {
 	.owner		= THIS_MODULE,
-	.open		= sbull_open,
-	.release	= sbull_release,
 };
 
 static const struct blk_mq_ops sbull_mq_ops = {
