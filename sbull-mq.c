@@ -288,7 +288,7 @@ static int __init sbull_init(void)
 	return 0;
 
 out_unregister:
-	unregister_blkdev(sbull_major, "sbd");
+	unregister_blkdev(sbull_major, "sbull");
 	return -ENOMEM;
 }
 
