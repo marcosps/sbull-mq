@@ -88,20 +88,18 @@ struct sbull_dev {
 static struct sbull_dev *Devices;
 
 /* Handle an I/O request */
-static blk_status_t sbull_transfer(struct sbull_dev *dev, unsigned long sector,
+static blk_status_t sbull_transfer(struct sbull_dev *dev, sector_t offset,
 			unsigned int len, char *buffer, int op)
 {
-	unsigned long offset = sectors_to_size(sector);
-
 	if ((offset + len) > dev->size) {
-		pr_notice("Beyond-end write (%ld %u)\n", offset, len);
+		pr_notice("Beyond-end write (%lld %u)\n", offset, len);
 		return BLK_STS_IOERR;
 	}
 
 	if  (debug)
-		pr_info("%s: %s, sector: %ld, len: %u, offset: %ld",
+		pr_info("%s: %s, len: %u, offset: %lld",
 			dev->gd->disk_name,
-			op == REQ_OP_WRITE ? "WRITE" : "READ", sector, len,
+			op == REQ_OP_WRITE ? "WRITE" : "READ", len,
 			offset);
 
 	/* will be only REQ_OP_READ or REQ_OP_WRITE */
@@ -140,7 +138,7 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 		len = bvec.bv_len;
 		mem = kmap_atomic(bvec.bv_page);
 
-		ret = sbull_transfer(dev, sector,
+		ret = sbull_transfer(dev, sectors_to_size(sector),
 				len,
 				mem + bvec.bv_offset, op);
 
