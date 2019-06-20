@@ -89,27 +89,26 @@ static struct sbull_dev *Devices;
 
 /* Handle an I/O request */
 static blk_status_t sbull_transfer(struct sbull_dev *dev, unsigned long sector,
-			unsigned long nsect, char *buffer, int op)
-
+			unsigned int len, char *buffer, int op)
 {
 	unsigned long offset = sectors_to_size(sector);
 
-	if ((offset + nsect) > dev->size) {
-		pr_notice("Beyond-end write (%ld %ld)\n", offset, nsect);
+	if ((offset + len) > dev->size) {
+		pr_notice("Beyond-end write (%ld %u)\n", offset, len);
 		return BLK_STS_IOERR;
 	}
 
 	if  (debug)
-		pr_info("%s: %s, sector: %ld, nsectors: %ld, offset: %ld",
+		pr_info("%s: %s, sector: %ld, len: %u, offset: %ld",
 			dev->gd->disk_name,
-			op == REQ_OP_WRITE ? "WRITE" : "READ", sector, nsect,
+			op == REQ_OP_WRITE ? "WRITE" : "READ", sector, len,
 			offset);
 
 	/* will be only REQ_OP_READ or REQ_OP_WRITE */
 	if (op == REQ_OP_WRITE)
-		memcpy(dev->data + offset, buffer, nsect);
+		memcpy(dev->data + offset, buffer, len);
 	else
-		memcpy(buffer, dev->data + offset, nsect);
+		memcpy(buffer, dev->data + offset, len);
 
 	return BLK_STS_OK;
 }
