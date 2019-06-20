@@ -18,6 +18,7 @@
 #include <linux/vmalloc.h>
 #include <linux/genhd.h>
 #include <linux/blk-mq.h>
+#include <linux/blkdev.h>
 #include <linux/buffer_head.h>	/* invalidate_bdev */
 #include <linux/bio.h>
 
@@ -121,7 +122,12 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct request *req = bd->rq;
 	struct sbull_dev *dev = req->rq_disk->private_data;
 	int op = req_op(req);
-	blk_status_t ret;
+	sector_t sector = blk_rq_pos(req);
+	unsigned int len;
+	struct bio_vec bvec;
+	struct req_iterator iter;
+	void *mem;
+	blk_status_t ret = BLK_STS_OK;
 
 	blk_mq_start_request(req);
 
@@ -133,10 +139,18 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 	}
 
 	spin_lock(&dev->lock);
-	ret = sbull_transfer(dev, blk_rq_pos(req),
-			blk_rq_cur_sectors(req),
-			bio_data(req->bio), op);
+	rq_for_each_segment(bvec, req, iter) {
+		len = bvec.bv_len;
+		mem = kmap_atomic(bvec.bv_page);
 
+		ret = sbull_transfer(dev, sector,
+				len,
+				mem + bvec.bv_offset, op);
+
+		sector += size_to_sectors(len);
+
+		kunmap_atomic(mem);
+	}
 	spin_unlock(&dev->lock);
 
 	blk_mq_end_request(req, ret);
