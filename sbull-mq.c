@@ -93,25 +93,23 @@ static blk_status_t sbull_transfer(struct sbull_dev *dev, unsigned long sector,
 
 {
 	unsigned long offset = sectors_to_size(sector);
-	unsigned long nbytes = sectors_to_size(nsect);
 
-	if ((offset + nbytes) > dev->size) {
-		pr_notice("Beyond-end write (%ld %ld)\n", offset, nbytes);
+	if ((offset + nsect) > dev->size) {
+		pr_notice("Beyond-end write (%ld %ld)\n", offset, nsect);
 		return BLK_STS_IOERR;
 	}
 
 	if  (debug)
-		pr_info("%s: %s, sector: %ld, nsectors: %ld, offset: %ld,"
-			       " nbytes: %ld",
+		pr_info("%s: %s, sector: %ld, nsectors: %ld, offset: %ld",
 			dev->gd->disk_name,
 			op == REQ_OP_WRITE ? "WRITE" : "READ", sector, nsect,
-			offset, nbytes);
+			offset);
 
 	/* will be only REQ_OP_READ or REQ_OP_WRITE */
 	if (op == REQ_OP_WRITE)
-		memcpy(dev->data + offset, buffer, nbytes);
+		memcpy(dev->data + offset, buffer, nsect);
 	else
-		memcpy(buffer, dev->data + offset, nbytes);
+		memcpy(buffer, dev->data + offset, nsect);
 
 	return BLK_STS_OK;
 }
