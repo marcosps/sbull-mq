@@ -76,7 +76,7 @@ struct sbull_dev {
 	struct blk_mq_tag_set tag_set;
 };
 
-static struct sbull_dev *Devices;
+static struct sbull_dev *devices;
 
 /* Handle an I/O request */
 static blk_status_t sbull_transfer(struct sbull_dev *dev, sector_t offset,
@@ -248,11 +248,11 @@ static int __init sbull_init(void)
 	/*
 	 * Allocate the device array, and initialize each one.
 	 */
-	Devices = kmalloc(ndevices * sizeof(struct sbull_dev), GFP_KERNEL);
-	if (Devices == NULL)
+	devices = kmalloc(ndevices * sizeof(struct sbull_dev), GFP_KERNEL);
+	if (devices == NULL)
 		goto out_unregister;
 	for (i = 0; i < ndevices; i++)
-		setup_device(Devices + i, i);
+		setup_device(devices + i, i);
 
 	return 0;
 
@@ -266,7 +266,7 @@ static void sbull_exit(void)
 	int i;
 
 	for (i = 0; i < ndevices; i++) {
-		struct sbull_dev *dev = Devices + i;
+		struct sbull_dev *dev = devices + i;
 
 		if (dev->gd) {
 			del_gendisk(dev->gd);
@@ -279,7 +279,7 @@ static void sbull_exit(void)
 			vfree(dev->data);
 	}
 	unregister_blkdev(sbull_major, "sbull");
-	kfree(Devices);
+	kfree(devices);
 }
 
 module_init(sbull_init);
