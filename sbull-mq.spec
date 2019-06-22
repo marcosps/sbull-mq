@@ -18,7 +18,7 @@
 #norootforbuild
 
 Name:           sbull-mq
-Version:        0.1
+Version:        0.2
 Release:        1
 Summary:        Reimplementation of sbull, but now using blk-mq
 License:        GPL-2.0-or-later
@@ -56,5 +56,8 @@ for flavor in %flavors_to_build; do
 done
 
 %changelog
+* Sat Jun 22 2019 Marcos Paulo de Souza <marcos.souza.org@gmail.com> - 0.2-0
+- Fix build in kernel 4.12
+
 * Fri Jun 21 2019 Marcos Paulo de Souza <marcos.souza.org@gmail.com> - 0.1-1
 - Initial version
