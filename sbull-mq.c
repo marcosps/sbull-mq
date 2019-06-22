@@ -21,14 +21,12 @@
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>	/* invalidate_bdev */
 #include <linux/bio.h>
+#include <linux/version.h>
 
-#ifndef BLK_STS_OK
+/* blk_status_t was introduced in kernel 4.12 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,12,0)
 typedef int blk_status_t;
 #define BLK_STS_OK 0
-#define OLDER_KERNEL 1
-#endif
-
-#ifndef BLK_STS_IOERR
 #define BLK_STS_IOERR 10
 #endif
 
