@@ -34,6 +34,11 @@ typedef int blk_status_t;
 #define SECTOR_SHIFT 9
 #endif
 
+/* blk_mq_init_sq_queue was introduced in kernel 4.20 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,20,0)
+#define SQ_FALLBACK
+#endif
+
 /* FIXME: implement these macros in kernel mainline */
 #define size_to_sectors(size) ((size) >> SECTOR_SHIFT)
 #define sectors_to_size(size) ((size) << SECTOR_SHIFT)
@@ -165,7 +170,7 @@ static struct request_queue *create_req_queue(struct blk_mq_tag_set *set)
 {
 	struct request_queue *q;
 
-#ifndef OLDER_KERNEL
+#ifndef SQ_FALLBACK
 	q = blk_mq_init_sq_queue(set, &sbull_mq_ops,
 			2, BLK_MQ_F_SHOULD_MERGE | BLK_MQ_F_BLOCKING);
 #else
