@@ -7,19 +7,13 @@
 #include <linux/init.h>
 
 #include <linux/sched.h>
-#include <linux/kernel.h>	/* printk() */
 #include <linux/slab.h>		/* kmalloc() */
 #include <linux/fs.h>		/* everything... */
 #include <linux/errno.h>	/* error codes */
-#include <linux/types.h>	/* size_t */
-#include <linux/fcntl.h>	/* O_ACCMODE */
-#include <linux/hdreg.h>	/* HDIO_GETGEO */
-#include <linux/kdev_t.h>
 #include <linux/vmalloc.h>
 #include <linux/genhd.h>
 #include <linux/blk-mq.h>
 #include <linux/blkdev.h>
-#include <linux/buffer_head.h>	/* invalidate_bdev */
 #include <linux/bio.h>
 #include <linux/version.h>
 
@@ -69,12 +63,6 @@ enum {
  * Minor number and partition management.
  */
 #define SBULL_MINORS	16
-
-/*
- * We can tweak our hardware sector size, but the kernel talks to us
- * in terms of small sectors, always.
- */
-#define KERNEL_SECTOR_SIZE	512
 
 /*
  * The internal representation of our device.
