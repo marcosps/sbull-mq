@@ -92,12 +92,12 @@ static blk_status_t sbull_transfer(struct sbull_dev *dev, sector_t offset,
 			unsigned int len, char *buffer, int op)
 {
 	if ((offset + len) > dev->size) {
-		pr_notice("Beyond-end write (%lld %u)\n", offset, len);
+		pr_notice("Beyond-end write (%ld %u)\n", offset, len);
 		return BLK_STS_IOERR;
 	}
 
 	if  (debug)
-		pr_info("%s: %s, len: %u, offset: %lld",
+		pr_info("%s: %s, len: %u, offset: %ld",
 			dev->gd->disk_name,
 			op == REQ_OP_WRITE ? "WRITE" : "READ", len,
 			offset);
