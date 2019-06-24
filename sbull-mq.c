@@ -41,14 +41,23 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static int sbull_major;
 module_param(sbull_major, int, 0);
+MODULE_PARM_DESC(sbull_major, "Major number. Default: allocate one automatically");
+
 static int logical_block_size = 512;
 module_param(logical_block_size, int, 0);
+MODULE_PARM_DESC(logical_block_size, "Logical block size. Default: 512");
+
 static char* disk_size = "256M";
 module_param(disk_size, charp, 0);
+MODULE_PARM_DESC(disk_size, "Disk size. Default: 256M");
+
 static int ndevices = 1;
 module_param(ndevices, int, 0);
+MODULE_PARM_DESC(ndevices, "Number of devices. Default: 1");
+
 static bool debug = false;
 module_param(debug, bool, false);
+MODULE_PARM_DESC(debug, "Debug flag. Default: false");
 
 /*
  * The different "request modes" we can use.
