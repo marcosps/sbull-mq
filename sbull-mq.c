@@ -59,9 +59,7 @@ static bool debug = false;
 module_param(debug, bool, false);
 MODULE_PARM_DESC(debug, "Debug flag. Default: false");
 
-/*
- * The different "request modes" we can use.
- */
+/* the different "request modes" we can use */
 enum {
 	RM_SIMPLE  = 0,	/* The extra-simple request function */
 	RM_FULL    = 1,	/* The full-blown version */
@@ -139,8 +137,7 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 		mem = kmap_atomic(bvec.bv_page);
 
 		ret = sbull_transfer(dev, sectors_to_size(sector),
-				len,
-				mem + bvec.bv_offset, op);
+				len, mem + bvec.bv_offset, op);
 
 		sector += size_to_sectors(len);
 
@@ -217,9 +214,8 @@ static void setup_device(struct sbull_dev *dev, int which)
 
 	blk_queue_logical_block_size(dev->queue, logical_block_size);
 	dev->queue->queuedata = dev;
-	/*
-	 * And the gendisk structure.
-	 */
+
+	/* allocate the gendisk structure  */
 	dev->gd = alloc_disk(SBULL_MINORS);
 	if (!dev->gd) {
 		pr_notice("alloc_disk failure\n");
@@ -240,23 +236,18 @@ out_vfree:
 		vfree(dev->data);
 }
 
-
-
 static int __init sbull_init(void)
 {
 	int i;
-	/*
-	 * Get registered.
-	 */
+
+	/* registered block device */
 	sbull_major = register_blkdev(sbull_major, "sbull");
 	if (sbull_major <= 0) {
 		pr_warn("sbull: unable to get major number\n");
 		return -EBUSY;
 	}
 
-	/*
-	 * Allocate the device array, and initialize each one.
-	 */
+	/* allocate the device array, and initialize each one */
 	devices = kmalloc(ndevices * sizeof(struct sbull_dev), GFP_KERNEL);
 	if (devices == NULL)
 		goto out_unregister;
