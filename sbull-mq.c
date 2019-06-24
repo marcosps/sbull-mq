@@ -112,6 +112,48 @@ static blk_status_t sbull_transfer(struct sbull_dev *dev, sector_t offset,
 	return BLK_STS_OK;
 }
 
+static blk_qc_t sbull_mq_make_request(struct request_queue *rq, struct bio *bio)
+{
+	struct bio_vec bvec;
+	struct bvec_iter iter;
+	unsigned int len;
+	void *mem;
+	int ret;
+	int op = bio_op(bio);
+	sector_t sector = bio->bi_iter.bi_sector;
+	struct sbull_dev *dev = bio->bi_disk->private_data;
+
+	if (bio_end_sector(bio) > get_capacity(bio->bi_disk))
+		goto io_error;
+
+	if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
+		pr_notice("Skip non-fs request\n");
+		bio_io_error(bio);
+		return BLK_QC_T_NONE;
+	}
+
+	bio_for_each_segment(bvec, bio, iter) {
+		len = bvec.bv_len;
+		mem = kmap_atomic(bvec.bv_page);
+
+		ret = sbull_transfer(dev, sectors_to_size(sector),
+				len, mem + bvec.bv_offset, op);
+
+		kunmap_atomic(mem);
+
+		if (ret != BLK_STS_OK)
+			goto io_error;
+
+		sector += size_to_sectors(len);
+	}
+
+	bio_endio(bio);
+	return BLK_QC_T_NONE;
+io_error:
+	bio_io_error(bio);
+	return BLK_QC_T_NONE;
+}
+
 static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 		const struct blk_mq_queue_data *bd)
 {
@@ -211,9 +253,19 @@ static void setup_device(struct sbull_dev *dev, int which)
 	}
 	spin_lock_init(&dev->lock);
 
-	dev->queue = create_req_queue(&dev->tag_set);
-	if (IS_ERR(dev->queue))
-		goto out_vfree;
+	switch (request_mode) {
+	case RM_BIO:
+		dev->queue = blk_alloc_queue(GFP_KERNEL);
+		if (!dev->queue)
+			goto out_vfree;
+		blk_queue_make_request(dev->queue, sbull_mq_make_request);
+		break;
+	default:
+		dev->queue = create_req_queue(&dev->tag_set);
+		if (IS_ERR(dev->queue))
+			goto out_vfree;
+		break;
+	}
 
 	blk_queue_logical_block_size(dev->queue, logical_block_size);
 	dev->queue->queuedata = dev;
