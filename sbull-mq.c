@@ -61,10 +61,13 @@ MODULE_PARM_DESC(debug, "Debug flag. Default: false");
 
 /* the different "request modes" we can use */
 enum {
-	RM_SIMPLE  = 0,	/* The extra-simple request function */
-	RM_FULL    = 1,	/* The full-blown version */
-	RM_NOQUEUE = 2,	/* Use make_request */
+	RM_DEFAULT  = 0,	/* mq op request */
+	RM_BIO = 1,	/* use make_request, handle BIOs */
 };
+
+static int request_mode = RM_DEFAULT;
+module_param(request_mode, int, 0);
+MODULE_PARM_DESC(request_mode, "Request mode. Default: 0 (MQ request)");
 
 /*
  * Minor number and partition management.
