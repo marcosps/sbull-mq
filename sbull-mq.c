@@ -81,7 +81,6 @@ struct sbull_dev {
 	int size;                       /* Device size in sectors */
 	u8 *data;                       /* The data array */
 	spinlock_t lock;                /* For mutual exclusion */
-	struct request_queue *queue;    /* The device request queue */
 	struct gendisk *gd;             /* The gendisk structure */
 	struct blk_mq_tag_set tag_set;
 };
@@ -242,6 +241,7 @@ static struct request_queue *create_req_queue(struct blk_mq_tag_set *set)
  */
 static void setup_device(struct sbull_dev *dev, int which)
 {
+	struct request_queue *queue;
 	long long sbull_size = memparse(disk_size, NULL);
 
 	memset(dev, 0, sizeof(struct sbull_dev));
@@ -255,20 +255,20 @@ static void setup_device(struct sbull_dev *dev, int which)
 
 	switch (request_mode) {
 	case RM_BIO:
-		dev->queue = blk_alloc_queue(GFP_KERNEL);
-		if (!dev->queue)
+		queue = blk_alloc_queue(GFP_KERNEL);
+		if (queue)
 			goto out_vfree;
-		blk_queue_make_request(dev->queue, sbull_mq_make_request);
+		blk_queue_make_request(queue, sbull_mq_make_request);
 		break;
 	default:
-		dev->queue = create_req_queue(&dev->tag_set);
-		if (IS_ERR(dev->queue))
+		queue = create_req_queue(&dev->tag_set);
+		if (IS_ERR(queue))
 			goto out_vfree;
 		break;
 	}
 
-	blk_queue_logical_block_size(dev->queue, logical_block_size);
-	dev->queue->queuedata = dev;
+	blk_queue_logical_block_size(queue, logical_block_size);
+	queue->queuedata = dev;
 
 	/* allocate the gendisk structure  */
 	dev->gd = alloc_disk(SBULL_MINORS);
@@ -279,7 +279,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	dev->gd->major = sbull_major;
 	dev->gd->first_minor = which*SBULL_MINORS;
 	dev->gd->fops = &sbull_ops;
-	dev->gd->queue = dev->queue;
+	dev->gd->queue = queue;
 	dev->gd->private_data = dev;
 	snprintf(dev->gd->disk_name, 32, "sbull%c", which + 'a');
 	set_capacity(dev->gd, size_to_sectors(sbull_size));
@@ -326,9 +326,8 @@ static void sbull_exit(void)
 		if (dev->gd) {
 			del_gendisk(dev->gd);
 			put_disk(dev->gd);
+			blk_cleanup_queue(dev->gd->queue);
 		}
-		if (dev->queue)
-			blk_cleanup_queue(dev->queue);
 
 		if (dev->data)
 			vfree(dev->data);
