@@ -127,8 +127,7 @@ static blk_qc_t sbull_mq_make_request(struct request_queue *rq, struct bio *bio)
 
 	if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
 		pr_notice("Skip non-fs request\n");
-		bio_io_error(bio);
-		return BLK_QC_T_NONE;
+		goto io_error;
 	}
 
 	bio_for_each_segment(bvec, bio, iter) {
@@ -170,9 +169,8 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
 		pr_notice("Skip non-fs request\n");
-		blk_mq_end_request(req, BLK_STS_IOERR);
-		spin_unlock(&dev->lock);
-		return BLK_STS_IOERR;
+		ret = BLK_STS_IOERR;
+		goto out;
 	}
 
 	spin_lock(&dev->lock);
@@ -188,7 +186,7 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 		kunmap_atomic(mem);
 	}
 	spin_unlock(&dev->lock);
-
+out:
 	blk_mq_end_request(req, ret);
 	return ret;
 }
