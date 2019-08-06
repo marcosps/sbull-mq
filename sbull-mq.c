@@ -170,7 +170,7 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (op != REQ_OP_READ && op != REQ_OP_WRITE) {
 		pr_notice("Skip non-fs request\n");
 		ret = BLK_STS_IOERR;
-		goto out;
+		goto io_error;
 	}
 
 	spin_lock(&dev->lock);
@@ -181,12 +181,15 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 		ret = sbull_transfer(dev, sectors_to_size(sector),
 				len, mem + bvec.bv_offset, op);
 
-		sector += size_to_sectors(len);
-
 		kunmap_atomic(mem);
+
+		if (ret != BLK_STS_OK)
+			goto io_error;
+
+		sector += size_to_sectors(len);
 	}
 	spin_unlock(&dev->lock);
-out:
+io_error:
 	blk_mq_end_request(req, ret);
 	return ret;
 }
