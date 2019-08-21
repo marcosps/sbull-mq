@@ -257,7 +257,7 @@ static void setup_device(struct sbull_dev *dev, int which)
 	switch (request_mode) {
 	case RM_BIO:
 		queue = blk_alloc_queue(GFP_KERNEL);
-		if (queue)
+		if (!queue)
 			goto out_vfree;
 		blk_queue_make_request(queue, sbull_mq_make_request);
 		break;
