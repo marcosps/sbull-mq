@@ -111,14 +111,28 @@ static blk_status_t sbull_transfer(struct sbull_dev *dev, sector_t offset,
 	return BLK_STS_OK;
 }
 
+static blk_status_t data_transfer(struct sbull_dev *dev, struct bio_vec bvec,
+				sector_t *sectors, int op)
+{
+	blk_status_t ret;
+	unsigned int len = bvec.bv_len;
+	void *mem = kmap_atomic(bvec.bv_page);
+
+	ret = sbull_transfer(dev, sectors_to_size(*sectors),
+				len, mem + bvec.bv_offset, op);
+
+	*sectors += size_to_sectors(len);
+	kunmap_atomic(mem);
+
+	return ret;
+}
+
 static blk_qc_t sbull_mq_make_request(struct request_queue *rq, struct bio *bio)
 {
 	struct bio_vec bvec;
 	struct bvec_iter iter;
-	unsigned int len;
-	void *mem;
-	int ret;
 	int op = bio_op(bio);
+	blk_status_t ret;
 	sector_t sector = bio->bi_iter.bi_sector;
 	struct sbull_dev *dev = bio->bi_disk->private_data;
 
@@ -131,18 +145,10 @@ static blk_qc_t sbull_mq_make_request(struct request_queue *rq, struct bio *bio)
 	}
 
 	bio_for_each_segment(bvec, bio, iter) {
-		len = bvec.bv_len;
-		mem = kmap_atomic(bvec.bv_page);
-
-		ret = sbull_transfer(dev, sectors_to_size(sector),
-				len, mem + bvec.bv_offset, op);
-
-		kunmap_atomic(mem);
-
+		ret = data_transfer(dev, bvec, &sector, op);
+		/* always return BLK_QC_T_NONE for bio based request */
 		if (ret != BLK_STS_OK)
 			goto io_error;
-
-		sector += size_to_sectors(len);
 	}
 
 	bio_endio(bio);
@@ -159,10 +165,8 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct sbull_dev *dev = req->rq_disk->private_data;
 	int op = req_op(req);
 	sector_t sector = blk_rq_pos(req);
-	unsigned int len;
 	struct bio_vec bvec;
 	struct req_iterator iter;
-	void *mem;
 	blk_status_t ret = BLK_STS_OK;
 
 	blk_mq_start_request(req);
@@ -175,18 +179,9 @@ static blk_status_t sbull_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	spin_lock(&dev->lock);
 	rq_for_each_segment(bvec, req, iter) {
-		len = bvec.bv_len;
-		mem = kmap_atomic(bvec.bv_page);
-
-		ret = sbull_transfer(dev, sectors_to_size(sector),
-				len, mem + bvec.bv_offset, op);
-
-		kunmap_atomic(mem);
-
+		ret = data_transfer(dev, bvec, &sector, op);
 		if (ret != BLK_STS_OK)
 			goto io_error;
-
-		sector += size_to_sectors(len);
 	}
 	spin_unlock(&dev->lock);
 io_error:
@@ -256,12 +251,14 @@ static void setup_device(struct sbull_dev *dev, int which)
 
 	switch (request_mode) {
 	case RM_BIO:
+		pr_info("Using bio request mode");
 		queue = blk_alloc_queue(GFP_KERNEL);
 		if (!queue)
 			goto out_vfree;
 		blk_queue_make_request(queue, sbull_mq_make_request);
 		break;
 	default:
+		pr_info("Using default request mode");
 		queue = create_req_queue(&dev->tag_set);
 		if (IS_ERR(queue))
 			goto out_vfree;
